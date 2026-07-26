@@ -91,42 +91,275 @@ kubectl exec -n bankapp deploy/ollama -- ollama pull tinyllama
 
 ---
 
-## CI/CD — GitOps Flow
+## CI/CD — GitOps Deployment Flow
 
+The BankApp uses a declarative GitOps deployment model with **Argo CD, Helm, Amazon EKS, Envoy Gateway, and cert-manager**.
+
+```text
+Developer
+    │
+    │ git push
+    ▼
+GitHub Repository
+    │
+    │ feat/gitops
+    ▼
+Argo CD
+    │
+    │ Detects Git changes
+    ▼
+Helm Chart
+    │
+    │ values-dev.yaml
+    ▼
+Amazon EKS
+    │
+    ├── BankApp
+    ├── MySQL
+    └── Ollama
+    │
+    ▼
+Envoy Gateway
+    │
+    │ Gateway API
+    ▼
+cert-manager
+    │
+    │ Let's Encrypt TLS
+    ▼
+HTTPS BankApp
 ```
-Code Push → GitHub Actions → Build & Push to DockerHub → Update k8s manifest → ArgoCD auto-sync → EKS
+
+### How the GitOps Flow Works
+
+1. Deployment changes are pushed to the `feat/gitops` branch.
+2. **Argo CD** monitors the Git repository for changes.
+3. Argo CD loads the Helm chart from `helm-chart/bankapp`.
+4. Helm renders the Kubernetes resources using `values-dev.yaml`.
+5. Argo CD automatically synchronizes the desired state to Amazon EKS.
+6. `selfHeal: true` restores resources when cluster state drifts from Git.
+7. `prune: true` removes resources deleted from the Git-managed configuration.
+8. **Envoy Gateway** routes external traffic to `bankapp-service`.
+9. **cert-manager** manages TLS certificates for secure HTTPS access.
+
+The Argo CD Application deploys:
+
+```text
+Repository:     cloudwithpreetham/AI-BankApp-DevOps
+Branch:         feat/gitops
+Path:           helm-chart/bankapp
+Values:         values-dev.yaml
+Namespace:      bankapp
+Auto Sync:      Enabled
+Self Healing:   Enabled
+Pruning:        Enabled
 ```
 
-1. Push code changes to `feat/gitops`
-2. **GitHub Actions** builds the app, pushes Docker image to DockerHub with commit SHA tag
-3. Workflow updates `k8s/bankapp-deployment.yml` with new image tag and commits back
-4. **ArgoCD** detects the manifest change and auto-syncs to EKS
-5. **EKS** performs a rolling update with zero downtime
+---
 
-**GitHub Secrets Required:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
+## GitOps Deployment Verification
+
+The final deployment was verified across the complete GitOps delivery path.
+
+### 1. Argo CD — Synced & Healthy
+
+Argo CD successfully reconciled the Helm chart from Git with the Amazon EKS cluster.
+
+```text
+Sync Status:   Synced
+Health Status: Healthy
+```
+
+![Argo CD Synced and Healthy](docs/screenshots/gitops/01-argocd-synced-healthy.png)
+
+---
+
+### 2. BankApp Workloads Running on Amazon EKS
+
+The GitOps-managed application stack is running successfully on Amazon EKS.
+
+The deployed workloads include:
+
+- BankApp
+- MySQL 8.0
+- Ollama
+
+All three deployments reached their expected ready state.
+
+![EKS BankApp Pods Running](docs/screenshots/gitops/02-eks-bankapp-pods-running.png)
+
+---
+
+### 3. Envoy Gateway Programmed
+
+Envoy Gateway provides external application traffic routing using the Kubernetes Gateway API.
+
+The `bankapp-gateway` successfully reached:
+
+```text
+PROGRAMMED: True
+```
+
+The `bankapp-route` HTTPRoute is attached to the Gateway and routes requests to the Argo CD-managed BankApp service.
+
+```text
+HTTPRoute
+    │
+    ▼
+bankapp-service:8080
+    │
+    ▼
+BankApp Pod
+```
+
+![Envoy Gateway Programmed](docs/screenshots/gitops/03-envoy-gateway-programmed.png)
+
+---
+
+### 4. Automated TLS with Let's Encrypt
+
+cert-manager successfully provisioned the BankApp TLS certificate through the configured Let's Encrypt issuer.
+
+Verification:
+
+```text
+Certificate:         bankapp-tls
+Certificate Ready:   True
+CertificateRequest:  Ready
+Issuer:              letsencrypt-prod
+ACME Order:          valid
+```
+
+![Let's Encrypt Certificate Ready](docs/screenshots/gitops/04-letsencrypt-certificate-ready.png)
+
+---
+
+### 5. BankApp Accessible over HTTPS
+
+The application is externally accessible through Envoy Gateway using HTTPS.
+
+```text
+Client
+  │
+  │ HTTPS :443
+  ▼
+AWS Load Balancer
+  │
+  ▼
+Envoy Gateway
+  │
+  ▼
+HTTPRoute
+  │
+  ▼
+bankapp-service:8080
+  │
+  ▼
+BankApp Pod
+```
+
+HTTPS verification successfully returned an HTTP redirect to the BankApp login page.
+
+![BankApp HTTPS Login](docs/screenshots/gitops/05-bankapp-https-login.png)
+
+---
+
+### 6. GitOps Commit History
+
+The deployment configuration is maintained in Git on the `feat/gitops` branch.
+
+The final GitOps changes include:
+
+- Helm-based BankApp deployment
+- Environment-specific Helm values
+- Argo CD Helm integration
+- Automated synchronization and self-healing
+- Repository source correction
+- Envoy Gateway routing correction
+- Amazon EKS deployment configuration
+- HTTPS and TLS integration
+
+![GitOps Commit History](docs/screenshots/gitops/06-gitops-commit-history.png)
 
 ---
 
 ## Project Structure
 
-```
-.
-├── terraform/              # Infrastructure as Code (VPC + EKS + ArgoCD)
-├── k8s/                    # Kubernetes manifests (ArgoCD watches this)
-│   ├── bankapp-deployment.yml
-│   ├── mysql-deployment.yml
-│   ├── ollama-deployment.yml
-│   ├── service.yml
-│   ├── gateway.yml         # Gateway API + HTTPS + session persistence
-│   ├── cert-manager.yml    # Let's Encrypt ClusterIssuer
-│   ├── hpa.yml             # Horizontal Pod Autoscaler
-│   └── ...                 # namespace, configmap, secrets, pv, pvc
+```text
+AI-BankApp-DevOps/
+│
 ├── argocd/
-│   └── application.yml     # ArgoCD Application
-├── .github/workflows/
-│   └── gitops-ci.yml       # CI → DockerHub → manifest update
-└── DEPLOYMENT.md           # Step-by-step deployment playbook
+│   └── application.yml
+│
+├── helm-chart/
+│   └── bankapp/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       ├── values-dev.yaml
+│       ├── values-staging.yaml
+│       ├── values-prod.yaml
+│       │
+│       └── templates/
+│           ├── _helpers.tpl
+│           ├── configmap.yaml
+│           ├── deployment.yaml
+│           ├── hpa.yaml
+│           ├── mysql-deployment.yaml
+│           ├── ollama-deployment.yaml
+│           ├── pvc.yaml
+│           ├── secret.yaml
+│           ├── service.yaml
+│           │
+│           ├── hooks/
+│           │   └── pre-install-job.yaml
+│           │
+│           └── tests/
+│               └── test-connection.yaml
+│
+├── k8s/
+│   ├── gatewayclass.yml
+│   ├── gateway.yml
+│   ├── cert-manager.yml
+│   └── ...
+│
+├── terraform/
+│   ├── provider.tf
+│   ├── variables.tf
+│   ├── terraform.tfvars
+│   ├── vpc.tf
+│   ├── eks.tf
+│   ├── argocd.tf
+│   ├── outputs.tf
+│   └── README.md
+│
+├── docs/
+│   └── screenshots/
+│       └── gitops/
+│           ├── 01-argocd-synced-healthy.png
+│           ├── 02-eks-bankapp-pods-running.png
+│           ├── 03-envoy-gateway-programmed.png
+│           ├── 04-letsencrypt-certificate-ready.png
+│           ├── 05-bankapp-https-login.png
+│           └── 06-gitops-commit-history.png
+│
+├── setup-k8s/
+│   └── kind-config.yaml
+│
+├── DEPLOYMENT.md
+├── README.md
+└── .gitignore
 ```
+
+### Key Directories
+
+| Directory | Purpose |
+|---|---|
+| `terraform/` | Provisions AWS networking, Amazon EKS, and supporting infrastructure |
+| `helm-chart/bankapp/` | Defines the deployable BankApp Helm chart |
+| `argocd/` | Defines the Argo CD GitOps Application |
+| `k8s/` | Contains Gateway API, TLS, and supporting Kubernetes resources |
+| `docs/screenshots/gitops/` | Stores final deployment verification screenshots |
+| `setup-k8s/` | Contains local Kubernetes development configuration |
 
 ---
 
