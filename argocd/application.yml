@@ -7,7 +7,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/TrainWithShubham/AI-BankApp-DevOps.git
+    repoURL: https://github.com/cloudwithpreetham/AI-BankApp-DevOps.git
     targetRevision: feat/gitops
     path: helm-chart/bankapp
     helm:
