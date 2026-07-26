@@ -1,13 +1,3 @@
-# Requires: Gateway API CRDs + Envoy Gateway installed on the cluster
-# On EKS, Envoy Gateway creates an AWS NLB for external access automatically.
-# Install steps documented in terraform/README.md
-apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: envoy-gateway
-spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -31,7 +21,7 @@ spec:
     - name: https
       protocol: HTTPS
       port: 443
-      hostname: 52.43.73.130.nip.io
+      hostname: 13.206.8.151.nip.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -49,7 +39,7 @@ metadata:
   namespace: bankapp
 spec:
   hostnames:
-    - 52.43.73.130.nip.io
+    - 13.206.8.151.nip.io
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
@@ -67,7 +57,7 @@ spec:
       backendRefs:
         - group: ""
           kind: Service
-          name: bankapp-service
+          name: bankapp-dev-service
           port: 8080
           weight: 1
 ---

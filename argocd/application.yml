@@ -5,13 +5,19 @@ metadata:
   namespace: argocd
 spec:
   project: default
+
   source:
     repoURL: https://github.com/TrainWithShubham/AI-BankApp-DevOps.git
     targetRevision: feat/gitops
-    path: k8s
+    path: helm-chart/bankapp
+    helm:
+      valueFiles:
+        - values-dev.yaml
+
   destination:
     server: https://kubernetes.default.svc
     namespace: bankapp
+
   syncPolicy:
     automated:
       prune: true

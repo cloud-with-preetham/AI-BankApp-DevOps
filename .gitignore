@@ -43,3 +43,6 @@ CLAUDE.md
 
 ### Speaker Notes (personal, not for repo) ###
 SPEAKER_NOTES.md
+
+### Helm ###
+*.tgz

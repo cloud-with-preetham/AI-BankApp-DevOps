@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bankapp.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bankapp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.bankapp.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "bankapp.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "bankapp.name" . }}
+    spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until nc -z {{ include "bankapp.fullname" . }}-mysql 3306; do
+                echo "Waiting for MySQL..."
+                sleep 2
+              done
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+        - name: wait-for-ollama
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until nc -z {{ include "bankapp.fullname" . }}-ollama 11434; do
+                echo "Waiting for Ollama..."
+                sleep 2
+              done
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+      containers:
+        - name: bankapp
+          image: "{{ .Values.bankapp.image.repository }}:{{ .Values.bankapp.image.tag }}"
+          imagePullPolicy: {{ .Values.bankapp.image.pullPolicy }}
+
+          ports:
+            - containerPort: 8080
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "bankapp.fullname" . }}-config
+            - secretRef:
+                name: {{ include "bankapp.fullname" . }}-secret
+
+          resources:
+{{ toYaml .Values.bankapp.resources | indent 12 }}
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            failureThreshold: 15
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 5

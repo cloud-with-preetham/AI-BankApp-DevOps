@@ -1,0 +1,21 @@
+bankapp:
+  replicaCount: 2
+
+  image:
+    tag: staging
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+    targetCPUUtilization: 75
+
+mysql:
+  persistence:
+    size: 5Gi
+    storageClass: gp2
+
+ollama:
+  persistence:
+    size: 10Gi
+    storageClass: gp2
