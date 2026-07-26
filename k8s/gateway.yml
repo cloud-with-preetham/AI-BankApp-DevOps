@@ -57,7 +57,7 @@ spec:
       backendRefs:
         - group: ""
           kind: Service
-          name: bankapp-dev-service
+          name: bankapp-service
           port: 8080
           weight: 1
 ---
