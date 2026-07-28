@@ -3,8 +3,8 @@ kind: Job
 metadata:
   name: {{ include "bankapp.fullname" . }}-preinstall
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   template:
     spec:
